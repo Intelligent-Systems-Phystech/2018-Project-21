@@ -1,0 +1,286 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Beamer Presentation
+% LaTeX Template
+% Version 1.0 (10/11/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND THEMES
+%----------------------------------------------------------------------------------------
+
+\documentclass[12pt]{beamer}
+\mode<presentation> {
+
+% The Beamer class comes with a number of default slide themes
+% which change the colors and layouts of slides. Below this is a list
+% of all the themes, uncomment each in turn to see what they look like.
+
+%\usetheme{default}
+%\usetheme{AnnArbor}
+%\usetheme{Antibes}
+%\usetheme{Bergen}
+%\usetheme{Berkeley}
+%\usetheme{Berlin}
+%\usetheme{Boadilla}
+%\usetheme{CambridgeUS}
+%\usetheme{Copenhagen}
+%\usetheme{Darmstadt}
+%\usetheme{Dresden}
+%\usetheme{Frankfurt}
+%\usetheme{Goettingen}
+%\usetheme{Hannover}
+%\usetheme{Ilmenau}
+%\usetheme{JuanLesPins}
+%\usetheme{Luebeck}
+\usetheme{Madrid}
+%\usetheme{Malmoe}
+%\usetheme{Marburg}
+%\usetheme{Montpellier}
+%\usetheme{PaloAlto}
+%\usetheme{Pittsburgh}
+%\usetheme{Rochester}
+%\usetheme{Singapore}
+%\usetheme{Szeged}
+%\usetheme{Warsaw}
+
+% As well as themes, the Beamer class has a number of color themes
+% for any slide theme. Uncomment each of these in turn to see how it
+% changes the colors of your current slide theme.
+
+%\usecolortheme{albatross}
+%\usecolortheme{beaver}
+%\usecolortheme{beetle}
+%\usecolortheme{crane}
+%\usecolortheme{dolphin}
+%\usecolortheme{dove}
+%\usecolortheme{fly}
+%\usecolortheme{lily}
+%\usecolortheme{orchid}
+%\usecolortheme{rose}
+%\usecolortheme{seagull}
+%\usecolortheme{seahorse}
+%\usecolortheme{whale}
+%\usecolortheme{wolverine}
+
+%\setbeamertemplate{footline} % To remove the footer line in all slides uncomment this line
+%\setbeamertemplate{footline}[page number] % To replace the footer line in all slides with a simple slide count uncomment this line
+
+%\setbeamertemplate{navigation symbols}{} % To remove the navigation symbols from the bottom of all slides uncomment this line
+}
+\usepackage[utf8]{inputenc}
+\usepackage{adjustbox}
+\usepackage[T2A]{fontenc}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{mathrsfs}
+\usepackage{euscript}
+\usepackage{upgreek}
+\usepackage[english,russian]{babel}
+\usepackage{array}
+\usepackage{theorem}
+\usepackage[all]{xy}
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{epstopdf}   
+\usepackage{tikz}       
+\usepackage{pgfplots}   
+\usepackage{color}
+\usepackage{ifthen}
+\usepackage{url}
+\usepackage{makeidx}
+\usepackage{pb-diagram}
+\usepackage{balance}
+\usepackage{multirow} 
+\usepackage{bibentry}
+\usepackage{graphicx} % Allows including images
+\usepackage{booktabs}
+\usepackage{graphics}
+\usepackage{cmap}
+\usepackage{amsthm}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage[absolute]{textpos}
+\usepackage{fleqn,psfrag,wrapfig,tikz}
+\usepackage{algpseudocode}
+ 
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title[Тензорные методы]{Методы выпуклой оптимизации высокого порядка} % The short title appears at the bottom of every slide, the full title is only on the title page
+
+\author{Даниил Селиханович} % Your name
+\institute[МФТИ] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
+{
+МФТИ\\ 
+ИППИ им. Харкевича РАН \\ % Your institution for the title page
+\medskip
+\textit{selihanovich.do@phystech.edu} % Your email address
+}
+\date{\today} % Date, can be changed to a custom date
+
+\begin{document}
+
+\begin{frame}
+\titlepage % Print the title page as the first slide
+\end{frame}
+
+\begin{frame}
+\frametitle{План доклада} % Table of contents slide, comment this block out to remove it
+\tableofcontents % Throughout your presentation, if you choose to use \section{} and \subsection{} commands, these will automatically be printed on this slide as an overview of your presentation
+\end{frame}
+
+%----------------------------------------------------------------------------------------
+%	PRESENTATION SLIDES
+%----------------------------------------------------------------------------------------
+
+%------------------------------------------------
+
+\section{Методы высоких порядков выпуклой оптимизации}
+\begin{frame}
+\frametitle{Тензорный шаг Нестерова}
+В работе \cite{nesterov2018implementable}, вышедшей в марте 2018 года, рассматривается следующий итерационный процесс для решения задачи выпуклой оптимизации $\min\limits_{x \in \mathbb{E}} f(x)$:
+$$
+x_{t + 1} = T_{p, M}(x_t), t \geq 0,
+$$
+где функция $f(x) \in \mathcal{F}_p$ - класс выпуклых и $p$-раз гладких функций, а $T_{p, M}(x_t) \in \arg\min_{y \in \mathbb{E}}\Omega_{x, p, M}(y)$, 
+$$
+\Omega_{x, p, M}(y) = f(x) +  \sum\limits_{i = 1}^p \frac{1}{i!}D^if(x)[y - x]^i + \frac{M}{(p - 1)!}\frac{||y - x||^{p + 1}}{p + 1}
+$$
+при $M \geq L_p$, $L_p$ - константа Липшица для $p$-й производной функции $f$.
+\end{frame}
+\begin{frame}
+\frametitle{Случай задачи с целевой функцией logistic-loss}
+Рассматривается задача бинарной классификацией с логистической функцией потерь:
+$$
+loss(w, y, X) = \sum\limits_{i = 1}^m \ln\Bigl(1 + \exp(-y_i\langle X_i, w \rangle)\Bigr) \to \min_{w \in \mathbb{R}^n},
+$$
+где $y_i \in \{1, -1\}$ - классы объектов, $m$ - число объектов, $X$ - матрица объектов-признаков с константым признаком 1, $n$ - размерность вектора в решающем правиле линейного классификатора:
+$$
+y_{predict}(w, x) = sign \langle w, x\rangle.
+$$
+\end{frame}
+\begin{frame}
+\frametitle{Оценка констант Липшица для logistic-loss}
+Определение константы Липшица для $p$-й производной функции $f$:
+$$
+||D^p f(x) - D^p f(y)|| \leq L_p||x - y||, \; x,y \in \mathrm{dom} \, f, p \geq 1.
+$$
+Для $p = 1 \to D^1 f(x) = \nabla f(x)$, для $p = 2 \to D^2 f(x) = \nabla^2 f(x)$.
+Можно показать, что в случае евклидовой нормы для такой функции выполнено:
+$$
+L_1 \leq \frac{1}{4}\sum\limits_{i = 1}^m ||X_i||_2^2 = M_1;
+$$
+$$
+L_2 \leq \frac{1}{6\sqrt{3}}\sum\limits_{i = 1}^m ||X_i||_2^3 \leq \frac{1}{10}\sum\limits_{i = 1}^m ||X_i||_2^3 = M_2. 
+$$
+\end{frame}
+\section{Применение для задачи классификации}
+\begin{frame}
+\frametitle{Цель работы}
+\begin{block}{Постановка задачи}
+\begin{itemize}
+	\item Применить тензорный метод Нестерова 2-го порядка в задаче бинарной классификации;
+	\item Рассмотреть разные способы проведения тензорного шага;
+	\item Сравнить результат работы с быстрым градиентным спуском;
+	\item Сравнить все алгоритмы с реализацией логистической регрессии в sklearn.
+\end{itemize}
+\end{block}
+\end{frame}
+\section{Описание данных}
+\begin{frame}
+\frametitle{Данные и их описание}
+Данные Covertype Data Set представляют собой задачу прогнозирования типа лесного покрова в штате Колорадо по картографическим признакам. Задача мультиклассовой классификации была предобработана в задачу бинарной.
+\newline
+\begin{itemize}
+	\item Всего 581012 объектов и 54 признака.
+	\item Из 54 признаков 10 количественные и 44 бинарные.
+	\item Количественные признаки нормированы на $[0, 1]$.
+	\item В обучение вошли 20000 объектов, в тест - 30000.
+	\item Распределение классов: 1-ый класс в train - 13978, в test - 7229, 2-й класс в train - 6022, в test = 22771.
+\end{itemize}
+\end{frame}
+
+\section{Результаты}
+\begin{frame}
+\frametitle{График logistic-loss от числа итераций}
+Видно, что алгоритмы сопряжённых градиентов и LBFGS в тензорном шаге Нестерова дают очень похожий результат.
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{all_f_iter.pdf}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{График нормы градиента от числа итераций}
+Метод 2-го порядка работает не намного лучше быстрого градиентного спуска.
+\begin{figure}
+	\includegraphics[width=0.8\linewidth]{all_gradf_iter.pdf}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Точность на train}
+Через большое число итераций все методы дают практически одинаковую точность на train.
+\begin{figure}
+	\includegraphics[width=0.8\linewidth]{accuracy_all_train.pdf}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Точность на test}
+FGM и метод 2-го порядка работают хуже на тестовых данных, чем реализованный в библиотеке LIBLINEAR.
+\begin{figure}
+	\includegraphics[width=0.8\linewidth]{accuracy_all_test.pdf}
+\end{figure}
+\end{frame}
+
+\section{Выводы}
+\begin{frame}
+\frametitle{Выводы}
+\begin{itemize}
+	\item Методы высоких порядков могут использоваться в задачах ML.
+	\item С повышением порядка метода увеличиваются вычислительные расходы по времени и памяти.
+	\item Константы Липшица стоит подбирать адаптивно.
+	\item Можно выбирать разные алгоритмы для выполнения тензорного шага.
+\end{itemize}
+\end{frame}
+
+
+
+\begin{frame}
+\frametitle{Литература}
+\bibliographystyle{amsalpha}
+\begin{thebibliography}{0}
+	
+	\bibitem[1]{nesterov2018implementable}
+	\emph{Nesterov Y.} Implementable tensor methods in unconstrained convex optimization. – Université catholique de Louvain, Center for Operations Research and Econometrics (CORE), 2018. – №. 2018005.
+	
+	\bibitem[2]{rodomanov}
+	\emph{Родоманов А. О., Кропотов Д. А., Ветров Д. П.} Анализ быстрого градиентного метода Нестерова для задач машинного обучения с $L_1$-регуляризацией.
+	
+	\bibitem[3]{gasnikov2018grad}
+	Современные численные методы оптимизации. Метод универсального градиентного спуска: учебное пособие / А. В. Гасников. – М. : МФТИ, 2018. –	181с. –	Изд. 2-е, доп.
+	
+	\bibitem[4]{tensormethods}
+	\emph{Гасников А. В. и др.} Обоснование гипотезы
+	об оптимальных оценках скорости сходимости численных методов выпуклой оптимизации высоких порядков.
+	
+\end{thebibliography}
+\end{frame}
+
+\begin{frame}
+\frametitle{Благодарность}
+Выражаю благодарность Е. А. Воронцовой и А. В. Гасникову за руководство проектом и обсуждения результатов!
+\end{frame}
+
+\begin{frame}
+\Huge{\centerline{Спасибо за внимание! Вопросы?}}
+\end{frame}
+
+\end{document}
