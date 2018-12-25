@@ -1,0 +1,244 @@
+\documentclass[12pt,twoside]{article}
+\usepackage{jmlda}
+\pgfplotsset{compat=1.13}
+\bibliographystyle{utf8gost705u}
+%\NOREVIEWERNOTES
+\title
+[Методы выпуклой оптимизации высокого порядка] % Краткое название; не нужно, если полное название влезает в~колонтитул
+{Методы выпуклой оптимизации высокого порядка}
+\author
+[Селиханович~Д.\,О.$^{1, 2}$, Гасников~А.\,В.$^{1, 2}$, Воронцова~Е.\,А.$^{3}$] % список авторов для колонтитула; не нужен, если основной список влезает в колонтитул
+{Селиханович~Д.\,О., Гасников~А.\,В., Воронцова~Е.\,А.} % основной список авторов, выводимый в оглавление
+[Селиханович~Д.\,О.$^{1, 2}$, Гасников~А.\,В.$^{1, 2}$, Воронцова~Е.\,А.$^{3}$] % список авторов, выводимый в заголовок; не нужен, если он не отличается от основного
+\thanks
+{Научный руководитель: Гасников~А.\,В. 
+	Задачу поставил: Александр Владимирович Гасников.
+	Консультант:  Воронцова~Е.\,А.}
+\email
+{selihanovich.do@phystech.edu (Селиханович Д.О.), gasnikov.av@mipt.ru (Гасников А.В.),
+	vorontsovaea@gmail.com (Воронцова Е.А.)}
+\organization
+{$^1$Московский физико-технический институт, Институтский пер., 9, Долгопрудный, Московская обл., 141700\par $^2$Институт проблем передачи информации им. А.А. Харкевича Российской академии наук, Большой Каретный пер., 19,
+	строение 1, Москва, 127051\par
+	$^3$Дальневосточный федеральный университет, Владивосток, Россия}
+\abstract
+{Для выпуклых задач не очень больших размерностей эффективно (до $n \sim 10^3$, иногда даже до $n \sim 10^4$) применяются методы высокого порядка. Принято считать, что это методы второго порядка (использующие вторые производные оптимизируемой функции). В данной работе рассматривается метод второго порядка, который является частным случаем общего метода, предложенного в начале 2018 года в работе Ю.Е. Нестерова \cite{nesterov2018implementable}. Предлагается на примере задачи логистической регрессии рассмотреть сходимость указанного метода, а также сравнить с другими известными методами, решающими эту задачу - быстрым градиентным методом \cite{rodomanov} и реализованными в библиотеке LIBLINEAR \cite{fan2008liblinear}.
+	
+	\bigskip
+	\textbf{Ключевые слова}: \emph {выпуклая оптимизация, матрица Гессе, нижние оценки, методы высокого порядка, тензорные методы, быстрый градиентный метод Нестерова, логистическая регрессия, метод сопряжённых градиентов, LBFGS}.}
+
+\begin{document}
+	\maketitle
+	
+	\section{Введение}
+	Целью данной работы является применение методов высокого порядка \cite{nesterov2018implementable} в задачах выпуклой оптимизации и исследование их свойств. В качестве тестовой функции рассматривается функция логистических потерь и на основании указанного метода оптимизации строится линейный классификатор, который обучается на данных Covertype Data Set \cite{blackard1999comparative}. В качестве критериев сравнения алгоритма с другими были выбраны скорость сходимости по итерациям и качество построенных классификаторов на тестовых данных. Особенностью исследований является применение разных способов решения вспомогательной задачи тензорного шага Нестерова, а именно методов сопряжённых градиентов и LBFGS. Целесообразность применения нового метода объясняется общепринятой практикой использования методов второго порядка в задаче логистической регрессии - Ньютона и IRLS. Рассматриваемый метод сравнивается с быстрым градиентным спуском Нестерова \cite{rodomanov} и методом из библиотеки sklearn \cite{fan2008liblinear}. В приложении к работе выводится оценка константы Липшица $L_2$ для функции логистических потерь, которая играет важную роль в методе Нестерова второго порядка.
+	\section{Постановка задачи}
+	Данные Covertype Data Set \cite{blackard1999comparative} представляют собой задачу прогнозирования типа лесного покрова в штате Колорадо по картографическим признакам. Задача мультиклассовой классификации была предобработана в задачу бинарной. Выборка состоит 581012 объектов, наделённых 54 признаками. Из 54 признаков 10 количественные и 44 бинарные. Количественные признаки нормированы на $[0, 1]$.
+	
+	Предлагается на данной задаче сравнить между собой линейные классификаторы, которые будут отличаться методом нахождения оптимального вектора весов. Так как все рассматриваемые методы работают с гладкими функциями, то в качестве оптимизируемой функции потерь была выбрана логистическая:
+	\begin{equation} \label{1}
+	loss(w, y, X) = \sum\limits_{i = 1}^m \ln\Bigl(1 + \exp\bigl(-y_i\langle X_i, w \rangle\bigr)\Bigr) \to \min_{w \in \mathbb{R}^n}, 
+	\end{equation}
+	где $y_i \in \{1, -1\}$ - классы объектов, $m$ - число объектов, $X$ - матрица объектов-признаков с константым признаком 1, $n$ - размерность вектора в решающем правиле линейного классификатора:
+	\begin{equation}
+	y_{predict}(w, x) = sign \langle w, x\rangle.
+	\end{equation}
+	В работе рассматриваются несколько способов оптимизации функции (\ref{1}): 
+	\begin{itemize}
+		\item Метод Нестерова второго порядка с разными способами выполнения тензорного шага - с помощью сопряжённых градиентов и LBFGS; 
+		\item Быстрый градиентный метод Нестерова;
+		\item Методом, лежащим в основе работы логистической регрессии из библиотеки sklearn с опцией solver = liblinear.
+	\end{itemize}.
+	\section{Базовый алгоритм}
+	В работе \cite{nesterov2018implementable} рассматривается следующий итерационный процесс для решения задачи выпуклой оптимизации $\min\limits_{x \in \mathbb{E}} f(x)$:
+	\begin{equation}
+	x_{t + 1} = T_{p, M}(x_t), t \geq 0,
+	\end{equation}
+	где функция $f(x) \in \mathcal{F}_p$ - класс выпуклых и $p$-раз гладких функций, а $T_{p, M}(x_t) \in \arg\min_{y \in \mathbb{E}}\Omega_{x_t, p, M}(y)$, 
+	\begin{equation}
+	\Omega_{x, p, M}(y) = f(x) +  \sum\limits_{i = 1}^p \frac{1}{i!}D^if(x)[y - x]^i + \frac{M}{(p - 1)!}\frac{||y - x||^{p + 1}}{p + 1}
+	\end{equation}
+	при $M \geq L_p$, $L_p$ - константа Липшица для $p$-й производной функции $f$. Здесь $D^i$ обозначает $i$-ю производную функции $f(x)$.
+	
+	Предлагается рассмотреть случай $p = 2$ для евклидовой нормы на примере функции $loss(w, y, X)$:
+	\begin{equation}
+	\Omega_{x, 2, M}(y) = f(x) +  \langle \nabla f(x), y - x \rangle + \bigl \langle \nabla^2 f(x)(y - x), y - x \bigr \rangle + \frac{M}{3}||y - x||_2^3 \to \min_{y \in \mathbb{R}^n}.
+	\end{equation}
+	В терминах оптимизируемого вектора параметров $w$ и обучающей выборки $(X_i, y_i)_{i = 1}^m$ процесс при $t \geq 0$ примет вид:
+	\begin{eqnarray} \label{2}
+	w_{t + 1} = T_{2, M}(w_t) = \arg\min_{w \in R^n} \Bigl[\langle \nabla_w loss(w_t, y, X), w - w_t \rangle + \nonumber \\ + \bigl \langle \nabla_w^2 loss(w_t, y, X)(w - w_t), w - w_t \bigr \rangle + \frac{M}{3}||w - w_t||_2^3 \Bigr].
+	\end{eqnarray}
+	Для данной задачи градиент и гессиан функции потерь равны:
+	\begin{eqnarray} \label{3}
+	\nabla_w loss(w_t, y, X) = -\sum\limits_{i = 1}^m \frac{y_iX_i}{1 + \exp\bigl(y_i\langle X_i, w \rangle\bigr)},
+	\end{eqnarray}
+	\begin{eqnarray} \label{4}
+	\nabla_w^2 loss(w_t, y, X) = \sum\limits_{i = 1}^m \frac{\exp\bigl(y_i\langle X_i, w \rangle\bigr)}{\Bigl(1 + \exp\bigl(y_i\langle X_i, w \rangle\bigr)\Bigr)^2}X_iX_i^T.
+	\end{eqnarray}
+	В приложении показывается, что в качестве константы $M \geq L_2$ можно взять величину $\frac{1}{10}\sum\limits_{i = 1}^m ||X_i||_2^3$. Задачу (\ref{2}) предлагается решать с помощью реализованных в модуле optimize библиотеки scipy методов сопряжённых градиентов и LBFGS на основе книги \cite{wright2006numerical}.
+	\section{Вычислительный эксперимент}
+	В качестве обучения линейных классификаторов было выбрано 20000 объектов, в тест - 30000. Распределение классов было следующим: 1-ый класс в train - 13978, в test - 7229, 2-й класс в train - 6022, в test = 22771. Отметим особенности первого графика. Во-первых, реализации тензорного шага Нестерова обоими методами - сопряжёнными градиентами и LBFGS - дали практически идентичный результат при использовании параметров по умолчанию. Это может объясняться тем, что обе процедуры схожи в том смысле, что сводятся к одномерному поиску. При этом метод второго порядка работает не намного лучше быстрого градиентного спуска и значительно уступает по скорости сходимости методу из библиотеки LIBLINEAR.
+	\begin{figure}[h]
+		\begin{center}
+			\caption{Зависимость функции потерь от номера итерации}
+		\includegraphics[width=0.8\linewidth]{all_f_iter.pdf}
+	\end{center}
+	\end{figure}
+
+	Как и можно было ожидать из первого графика, качество классификации на тестовых данных у построенных классификаторов оказалось наилучшем для Logistic Regression, реализованного в библиотеке sklearn.
+	\begin{figure}[h]
+	\begin{center}
+		\caption{Зависимость точности классификации от номера итерации}
+		\includegraphics[width=0.8\linewidth]{accuracy_all_test.pdf}
+	\end{center}
+	\end{figure}
+	\section{Выводы}
+	Хотя в целом результаты применения рассматриваемого метода оказались хуже стандартной реализации логистической регрессии из sklearn, работа показывает, что методы высоких порядков могут использоваться в задачах машинного обучения. Важно заметить, что с повышением порядка метода увеличиваются вычислительные расходы по времени и памяти. В дальнейшем планируется подбирать константы Липшица адаптивно. При этом для указанных методом можно выбирать разные алгоритмы для выполнения тензорного шага, что порождает целый класс новых методов оптимизаций. Возможна модификация работы с рассмотрением случая $p = 3$, а также других гладких функций потерь.
+	\begin{thebibliography}{1}
+		\def\selectlanguageifdefined#1{
+			\expandafter\ifx\csname date#1\endcsname\relax
+			\else\language\csname l@#1\endcsname\fi}
+		\ifx\undefined\url\def\url#1{{\small #1}}\else\fi
+		\ifx\undefined\BibUrl\def\BibUrl#1{\url{#1}}\else\fi
+		\ifx\undefined\BibAnnote\long\def\BibAnnote#1{(#1)}\else\fi
+		\ifx\undefined\BibEmph\def\BibEmph#1{\emph{#1}}\else\fi
+		
+		\bibitem{nesterov2018implementable}
+		\selectlanguageifdefined{russian}
+		NESTEROV Yu. Implementable tensor methods in unconstrained convex optimization // CORE Discussion Papers 2018005. 2018. Université catholique de Louvain, Center for Operations Research and Econometrics (CORE).
+		
+		\bibitem{rodomanov}
+		\selectlanguageifdefined{russian}
+		Родоманов~Антон~Олегович, Кропотов~Дмитрий~Александрович, Ветров~Дмитрий~Петрович. Анализ быстрого градиентного метода Нестерова для задач
+		машинного обучения с $L_1$-регуляризацией~// e-print.
+		\newblock 2014. URL:
+		http://www.machinelearning.ru/wiki/images/0/03/Rodomanov\verb|_|FGM.pdf.
+		
+		\bibitem{fan2008liblinear}
+		\selectlanguageifdefined{russian}
+		LIBLINEAR: A library for large linear classification~/ Rong-En~Fan,
+		Kai-Wei~Chang, Cho-Jui~Hsieh {[и~др.]}~// Journal of machine learning
+		research.
+		\newblock 2008.
+		\newblock Т.~9, {№}~Aug.
+		\newblock {С.}~1871--1874.
+		
+		\bibitem{blackard1999comparative}
+		\selectlanguageifdefined{russian}
+		Blackard~Jock~A, Dean~Denis~J. Comparative accuracies of artificial neural
+		networks and discriminant analysis in predicting forest cover types from
+		cartographic variables~// Computers and electronics in agriculture.
+		\newblock 1999.
+		\newblock Т.~24, {№}~3.
+		\newblock {С.}~131--151.
+		
+		\bibitem{gasnikov2018grad}
+		\selectlanguageifdefined{russian}
+		Современные численные методы оптимизации. Метод универсального градиентного спуска: учебное пособие~/ А.~В.~Гасников. 
+		\newblock – М. : МФТИ, 2018. 
+		\newblock – 166с. 
+		\newblock – Изд. 2-е, доп.
+		
+		\bibitem{gasnikov2018global}
+		\selectlanguageifdefined{russian}
+		The global rate of convergence for optimal tensor methods in smooth convex
+		optimization~/ Alexander~Gasnikov, Dmitry~Kovalev, Ahmed~Mohhamed
+		{[и~др.]}~// arXiv preprint arXiv:1809.00382.
+		\newblock 2018.
+		
+		\bibitem{nesterov2008accelerating}
+		\selectlanguageifdefined{russian}
+		Nesterov~Yu. Accelerating the cubic regularization of Newton’s method on
+		convex problems~// Mathematical Programming.
+		\newblock 2008.
+		\newblock Т. 112, {№}~1.
+		\newblock {С.}~159--181.
+		
+		\bibitem{monteiro2013accelerated}
+		\selectlanguageifdefined{russian}
+		Monteiro~Renato~DC, Svaiter~Benar~Fux. An accelerated hybrid proximal
+		extragradient method for convex optimization and its implications to
+		second-order methods~// SIAM Journal on Optimization.
+		\newblock 2013.
+		\newblock Т.~23, {№}~2.
+		\newblock {С.}~1092--1125.
+		
+		\bibitem{dolgopolik}
+		\selectlanguageifdefined{russian}
+		Долгополик~М.В. Оптимальный градиентный
+		метод минимизации выпуклых функций~// e-print.
+		\newblock 2016. URL:
+		http://www.apmath.spbu.ru/cnsa/pdf/2016/DolgopolikMV\verb|_|10November2016.pdf.
+		
+		\bibitem{bubeck2015convex}
+		\selectlanguageifdefined{russian}
+		Bubeck~S{\'e}bastien {[и~др.]}. Convex optimization: Algorithms and
+		complexity~// Foundations and Trends{\textregistered} in Machine Learning.
+		\newblock 2015.
+		\newblock Т.~8, {№}~3-4.
+		\newblock {С.}~231--357.
+		
+		\bibitem{wright2006numerical}
+		\selectlanguageifdefined{russian}
+		Wright S., Nocedal J. Numerical optimization 2nd~// 
+		\newblock Springer Science. 
+		\newblock 2006. 
+		
+	\end{thebibliography}
+	
+\section{Приложение. Оценка констант Липшица для функции логистических потерь.}
+Напомним определение константы Липшица для $p$-й производной функции $f$:
+\begin{equation}
+||D^p f(x) - D^p f(y)|| \leq L_p||x - y||, \; x,y \in \mathrm{dom} \, f, p \geq 1.
+\end{equation}
+Для $p = 1 \to D^1 f(x) = \nabla f(x)$, для $p = 2 \to D^2 f(x) = \nabla^2 f(x)$.
+Будем рассматривать случай евклидовой нормы. 
+
+Оценим разность $||\nabla_w loss(w_1, y, X) - \nabla_w loss(w_2, y, X)||_2$ согласно (\ref{3}), пользуясь неравенством треугольника для нормы и равенством $|y_i| = 1 \; \forall i \in \overline{1, m}$:
+\begin{equation}
+||\nabla_w loss(w_1, y, X) - \nabla_w loss(w_2, y, X)||_2 \leq
+\sum\limits_{i = 1}^m\Bigl|\frac{1}{1 + \exp\bigl(y_i\langle X_i, w_1 \rangle\bigr)} - \frac{1}{1 + \exp\bigl(y_i\langle X_i, w_2 \rangle\bigr)}\Bigr|||X_i||_2.
+\end{equation}
+Заметим, что согласно формуле Лагранжа конечных приращений:
+\begin{equation} \label{5}
+\Bigl|\frac{1}{1 + e^x} - \frac{1}{1 + e^y}\Bigr| \leq \max_{x \in \mathbb{R}}\Bigl|\bigl(\frac{1}{1 + e^x}\bigr)^{'}\Bigr||x - y| = \max_{z \in \mathbb{R}}\Bigl|\frac{e^z}{(1 + e^z)^2}\Bigr||x - y| = \frac{1}{4}|x - y|.
+\end{equation}
+Это позволяет оценить величину под знаком суммы при помощи (\ref{5}) и неравенства Коши-Буняковского-Шварца:
+\begin{equation}
+\Bigl|\frac{1}{1 + \exp\bigl(y_i\langle X_i, w_1 \rangle\bigr)} - \frac{1}{1 + \exp\bigl(y_i\langle X_i, w_2 \rangle\bigr)}\Bigr| \leq \frac{1}{4}\bigl|\langle X_i, w_1 - w_2 \rangle\bigr| \leq \frac{1}{4}||w_1 - w_2||_2 ||X_i||_2.
+\end{equation}
+Суммируя, получим оценку:
+\begin{equation}
+||\nabla_w loss(w_1, y, X) - \nabla_w loss(w_2, y, X)||_2 \leq \frac{1}{4}\sum\limits_{i = 1}^m ||X_i||_2^2 ||w_1 - w_2||_2 = M_1||w_1 - w_2||_2,
+\end{equation}
+где $M_1 = \frac{1}{4}\sum\limits_{i = 1}^m ||X_i||_2^2 \geq L_1$ - оценка на константу Липшица $L_1$.
+ 
+ Аналогичным способом получим оценку на константу Липшица $L_2$:
+\begin{eqnarray} \label{6}
+||\nabla_w^2 loss(w_1, y, X) - \nabla_w^2 loss(w_2, y, X)||_2 \leq \nonumber \\ 
+\leq \sum\limits_{i = 1}^m\Bigl|\frac{\exp\bigl(y_i\langle X_i, w_1 \rangle\bigr)}{\bigl(1 + \exp\bigl(y_i\langle X_i, w_1 \rangle\bigr)\bigr)^2} - \frac{\exp\bigl(y_i\langle X_i, w_2 \rangle\bigr)}{\bigl(1 + \exp\bigl(y_i\langle X_i, w_2 \rangle\bigr)\bigr)^2}\Bigr|||X_iX_i^T||_2.
+\end{eqnarray}
+По определению нормы оператора:
+\begin{eqnarray}
+|||X_iX_i^T||_2 = \sup_{z \neq 0} \frac{||X_iX_i^T z||_2}{||z||_2} = \sup_{z \neq 0} \sqrt{\frac{\bigl\langle X_i(X_i^Tz), X_i(X_i^T z) \bigr\rangle}{\langle z, z \rangle}} = \sup_{z \neq 0} \frac{|X_i^Tz|||X_i||_2}{||z||_2} \leq \nonumber \\ \leq \sup_{z \neq 0} \frac{||z||_2||X_i||_2^2}{||z||_2} = ||X_i||_2^2,
+\end{eqnarray}
+где мы воспользовались ассоциативностью матричного умножения и неравенством Коши-Буняковского-Шварца. С другой стороны, предполагая $X_i \neq 0_n$, получим 
+\begin{eqnarray}
+|||X_iX_i^T||_2 = \sup_{z \neq 0} \frac{||X_iX_i^T z||_2}{||z||_2} \geq \frac{||X_iX_i^T X_i||_2}{||X_i||_2} = \frac{||X_i(X_i^T X_i)||_2}{||X_i||_2} = \frac{|X_i^T X_i|||X_i||_2}{||X_i||_2} = ||X_i||^2.
+\end{eqnarray}
+Очевидно, что полученная оценка $|||X_iX_i^T||_2 \geq ||X_i||^2$ в случае $X_i \neq 0_n$ остаётся справедливой и в случае $X_i = 0_n$. Таким образом, мы заключаем, что всегда имеет место равенство $||X_iX_i^T||_2 = ||X_i||_2^2$. Величину под знаком суммы в (\ref{6}) также оценим через формулу Лагранжа конечных приращений:
+\begin{eqnarray}
+\Bigl|\frac{e^x}{(1 + e^x)^2} - \frac{e^y}{(1 + e^y)^2}\Bigr| \leq \max_{z \in \mathbb{R}}\Bigl|\bigl(\frac{e^z}{(1 + e^z)^2}\bigr)^{'}\Bigr||x - y| = \nonumber \\ = \max_{z \in \mathbb{R}}\Bigl|\frac{e^z(1 - e^z)}{(1 + e^z)^3}\Bigr||x - y| = \frac{1}{6\sqrt{3}}|x - y|
+\end{eqnarray}
+Отсюда:
+\begin{eqnarray}
+\Bigl|\frac{\exp\bigl(y_i\langle X_i, w_1 \rangle\bigr)}{\bigl(1 + \exp\bigl(y_i\langle X_i, w_1 \rangle\bigr)\bigr)^2} - \frac{\exp\bigl(y_i\langle X_i, w_2 \rangle\bigr)}{\bigl(1 + \exp\bigl(y_i\langle X_i, w_2 \rangle\bigr)\bigr)^2}\Bigr| \leq \nonumber \\ \leq \frac{1}{6\sqrt{3}}\bigl|\langle X_i, w_1 - w_2\rangle \bigr| \leq \frac{1}{6\sqrt{3}}||X_i||_2||w_1 - w_2||_2.
+\end{eqnarray} 
+Суммируя, получим оценку:
+\begin{eqnarray}
+||\nabla_w^2 loss(w_1, y, X) - \nabla_w^2 loss(w_2, y, X)||_2 \leq \frac{1}{6\sqrt{3}}\sum\limits_{i = 1}^m ||X_i||_2^3 ||w_1 - w_2||_2 \leq \nonumber \\ \leq \frac{1}{10}\sum\limits_{i = 1}^m ||X_i||_2^3 ||w_1 - w_2||_2 = M_2||w_1 - w_2||_2,
+\end{eqnarray}
+где $M_2 = \frac{1}{10}\sum\limits_{i = 1}^m ||X_i||_2^3 \geq L_2$ - оценка на константу Липшица $L_2$.
+
+\end{document}
+
